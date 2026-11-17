@@ -74,6 +74,12 @@ func newOperationCommand(operation ops.Operation, opts *options) *cobra.Command 
 
 func registerFlags(command *cobra.Command, operation ops.Operation) {
 	flags := command.Flags()
+	fileIDFlag := ""
+	for _, field := range operation.Fields {
+		if field.Name == "fileId" {
+			fileIDFlag = field.Flag
+		}
+	}
 	for _, field := range operation.Fields {
 		description := fieldDescription(field)
 		switch field.Kind {
@@ -108,7 +114,19 @@ func registerFlags(command *cobra.Command, operation ops.Operation) {
 				return values, cobra.ShellCompDirectiveNoFileComp
 			})
 		}
-		if field.Required && (field.Kind == ops.FileKind || field.Kind == ops.FileListKind) {
+	}
+	for _, field := range operation.Fields {
+		if !field.Required {
+			continue
+		}
+		switch field.Kind {
+		case ops.FileKind:
+			if fileIDFlag != "" && field.Name == "fileInput" {
+				command.MarkFlagsOneRequired(field.Flag, fileIDFlag)
+			} else {
+				_ = command.MarkFlagRequired(field.Flag)
+			}
+		case ops.FileListKind:
 			_ = command.MarkFlagRequired(field.Flag)
 		}
 	}
@@ -151,7 +169,49 @@ func buildParams(cmd *cobra.Command, operation ops.Operation) ([]stirling.Param,
 		}
 		params = append(params, stirling.Param{Name: name, Value: input})
 	}
+	if err := validateFileParams(operation, params); err != nil {
+		return nil, err
+	}
 	return params, nil
+}
+
+// validateFileParams enforces required file fields and the choice between an
+// upload and a server-side file ID.
+func validateFileParams(operation ops.Operation, params []stirling.Param) error {
+	present := make(map[string]bool, len(params))
+	for _, param := range params {
+		present[param.Name] = true
+	}
+	if present["fileInput"] && present["fileId"] {
+		return fmt.Errorf("--file and --file-id cannot be used together")
+	}
+	fileIDAllowed := false
+	for _, field := range operation.Fields {
+		if field.Name == "fileId" {
+			fileIDAllowed = true
+			break
+		}
+	}
+	for _, field := range operation.Fields {
+		if !field.Required {
+			continue
+		}
+		switch field.Kind {
+		case ops.FileKind:
+			if present[field.Name] {
+				continue
+			}
+			if field.Name == "fileInput" && fileIDAllowed && present["fileId"] {
+				continue
+			}
+			return fmt.Errorf("required flag(s) %q not set", field.Flag)
+		case ops.FileListKind:
+			if !present[field.Name] {
+				return fmt.Errorf("required flag(s) %q not set", field.Flag)
+			}
+		}
+	}
+	return nil
 }
 
 func readParam(cmd *cobra.Command, field ops.Field) (*stirling.Param, error) {

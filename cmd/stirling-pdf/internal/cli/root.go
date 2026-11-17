@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,8 +11,6 @@ import (
 	"github.com/mheers/stirling-pdf-golang/stirling"
 	"github.com/spf13/cobra"
 )
-
-const envPrefix = "STIRLING"
 
 // options are the global command-line settings shared by all commands.
 type options struct {
@@ -98,7 +97,7 @@ func exitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	if errors.Is(err, errCanceled) {
+	if errors.Is(err, errCanceled) || errors.Is(err, context.Canceled) {
 		return 130
 	}
 	return 1

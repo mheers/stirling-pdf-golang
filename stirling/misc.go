@@ -28,7 +28,7 @@ type MetadataOptions struct {
 type ScannerEffectOptions struct {
 	Quality         ScanQuality
 	Rotation        ScanRotation
-	Colorspace      ColorType
+	Colorspace      ScannerColorspace
 	Border          *int
 	Rotate          *int
 	RotateVariance  *int
@@ -390,6 +390,9 @@ func (c *Client) AutoRename(ctx context.Context, in FileInput, opts *AutoRenameO
 
 // AddStamp draws a text or image stamp on selected pages.
 func (c *Client) AddStamp(ctx context.Context, in FileInput, opts StampOptions) (*Result, error) {
+	if opts.Type == "" {
+		return nil, fmt.Errorf("stirling: add stamp: stamp type is required")
+	}
 	params, err := inputParams(in)
 	if err != nil {
 		return nil, err
@@ -397,13 +400,11 @@ func (c *Client) AddStamp(ctx context.Context, in FileInput, opts StampOptions) 
 	if opts.Pages != "" {
 		params = append(params, Param{Name: "pageNumbers", Value: opts.Pages})
 	}
-	if opts.Type != "" {
-		params = append(params, Param{Name: "stampType", Value: string(opts.Type)})
-	}
+	params = append(params, Param{Name: "stampType", Value: string(opts.Type)})
 	if opts.Text != "" {
 		params = append(params, Param{Name: "stampText", Value: opts.Text})
 	}
-	if opts.Image != nil {
+	if !isNilFile(opts.Image) {
 		params = append(params, Param{Name: "stampImage", Value: opts.Image})
 	}
 	if opts.Alphabet != "" {
@@ -457,7 +458,7 @@ func (c *Client) AddPageNumbers(ctx context.Context, in FileInput, opts PageNumb
 
 // AddImage places an image on a PDF page. Coordinates are in PDF points.
 func (c *Client) AddImage(ctx context.Context, in FileInput, opts AddImageOptions) (*Result, error) {
-	if opts.Image == nil {
+	if isNilFile(opts.Image) {
 		return nil, fmt.Errorf("stirling: add image: an image file is required")
 	}
 	params, err := inputParams(in)

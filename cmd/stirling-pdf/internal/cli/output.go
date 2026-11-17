@@ -12,6 +12,7 @@ import (
 	"github.com/mheers/stirling-pdf-golang/internal/ops"
 	"github.com/mheers/stirling-pdf-golang/stirling"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 func writeResult(cmd *cobra.Command, operation ops.Operation, result *stirling.Result) error {
@@ -20,17 +21,22 @@ func writeResult(cmd *cobra.Command, operation ops.Operation, result *stirling.R
 	output, _ := cmd.Flags().GetString("output")
 	force, _ := cmd.Flags().GetBool("force")
 	toStdout, _ := cmd.Flags().GetBool("stdout")
+	if output != "" && toStdout {
+		return errors.New("--output and --stdout cannot be used together")
+	}
 
 	if operation.Filter {
 		matched := !result.IsEmpty()
 		if !matched {
-			fmt.Fprintln(cmd.OutOrStdout(), false)
-			return nil
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), false)
+			return err
 		}
 		if toStdout || output == "-" {
 			return writeBinary(cmd, operation, result, output, toStdout, force)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), true)
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), true); err != nil {
+			return err
+		}
 		if output == "" {
 			return nil
 		}
@@ -93,8 +99,8 @@ func writeBinary(cmd *cobra.Command, operation ops.Operation, result *stirling.R
 	if err := result.Save(output); err != nil {
 		return err
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), output)
-	return nil
+	_, err := fmt.Fprintln(cmd.OutOrStdout(), output)
+	return err
 }
 
 func writeData(cmd *cobra.Command, output string, force bool, data []byte) error {
@@ -110,8 +116,8 @@ func writeData(cmd *cobra.Command, output string, force bool, data []byte) error
 	if err := os.WriteFile(output, data, 0o644); err != nil {
 		return err
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), output)
-	return nil
+	_, err := fmt.Fprintln(cmd.OutOrStdout(), output)
+	return err
 }
 
 func defaultFilename(operation ops.Operation, result *stirling.Result) string {
@@ -126,11 +132,7 @@ func defaultFilename(operation ops.Operation, result *stirling.Result) string {
 }
 
 func isTerminal(file *os.File) bool {
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(file.Fd()))
 }
 
 func parseObjectList(raw string) ([]map[string]any, error) {

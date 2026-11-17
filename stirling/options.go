@@ -187,6 +187,17 @@ const (
 	ColorModeBlackWhite ColorType = "blackwhite"
 )
 
+// ScannerColorspace is the color mode used by [Client.ScannerEffect]. The
+// scanner endpoint spells greyscale as "grayscale", unlike the conversion
+// endpoints, which use [ColorModeGreyscale].
+type ScannerColorspace string
+
+// Scanner-effect color modes.
+const (
+	ScannerColorspaceColor     ScannerColorspace = "color"
+	ScannerColorspaceGrayscale ScannerColorspace = "grayscale"
+)
+
 // ImageOutput selects one combined image or one image per page.
 type ImageOutput string
 

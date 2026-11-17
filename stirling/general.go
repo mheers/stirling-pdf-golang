@@ -271,7 +271,7 @@ func (c *Client) Merge(ctx context.Context, files []FileInput, opts *MergeOption
 
 // ExtractBookmarks returns the document outline as a JSON object.
 func (c *Client) ExtractBookmarks(ctx context.Context, in FileInput) (map[string]any, error) {
-	if in == nil {
+	if isNilFile(in) {
 		return nil, fmt.Errorf("stirling: extract bookmarks: an input file is required")
 	}
 	params := []Param{{Name: "file", Value: in}}

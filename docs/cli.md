@@ -12,7 +12,7 @@ From a checkout:
 go build -o bin/stirling-pdf ./cmd/stirling-pdf
 ```
 
-Once the repository is published:
+Or install the latest published version:
 
 ```bash
 go install github.com/mheers/stirling-pdf-golang/cmd/stirling-pdf@latest
@@ -174,6 +174,11 @@ stirling-pdf misc ocr-pdf --file scan.pdf --languages eng,deu --ocr-type skip-te
 
 # Redact a list of words
 stirling-pdf security auto-redact --file contract.pdf --list-of-text "secret,internal" -o redacted.pdf
+
+# Redact rectangular areas (object arrays are passed as JSON)
+stirling-pdf security redact --file contract.pdf \
+  --redactions '[{"x":100,"y":200,"width":300,"height":50,"page":1,"color":"#000000"}]' \
+  -o redacted.pdf
 
 # Encrypt and later decrypt
 stirling-pdf security add-password --file report.pdf --password reader --owner-password owner --key-length 256 -o locked.pdf

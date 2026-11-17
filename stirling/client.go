@@ -160,8 +160,13 @@ func WithUserAgent(userAgent string) Option {
 }
 
 // WithHeader adds a header to every request. It can be called repeatedly.
+// Headers set this way replace SDK defaults such as Accept and Content-Type;
+// [WithAPIKey] and [WithUserAgent] still control their own headers.
 func WithHeader(name, value string) Option {
 	return func(c *Client) error {
+		if strings.TrimSpace(name) == "" {
+			return errors.New("stirling: header name must not be empty")
+		}
 		c.headers.Set(name, value)
 		return nil
 	}
@@ -200,6 +205,9 @@ func WithRetryWait(minWait, maxWait time.Duration) Option {
 // request. Editors run after the SDK sets its own headers.
 func WithRequestEditor(editor RequestEditor) Option {
 	return func(c *Client) error {
+		if editor == nil {
+			return errors.New("stirling: request editor must not be nil")
+		}
 		c.editors = append(c.editors, editor)
 		return nil
 	}
@@ -355,9 +363,7 @@ func (c *Client) do(ctx context.Context, method, path string, f *form) (*http.Re
 
 func (c *Client) applyHeaders(req *http.Request) {
 	for name, values := range c.headers {
-		for _, value := range values {
-			req.Header.Add(name, value)
-		}
+		req.Header[name] = append([]string(nil), values...)
 	}
 	if c.apiKey != "" {
 		req.Header.Set("X-API-KEY", c.apiKey)

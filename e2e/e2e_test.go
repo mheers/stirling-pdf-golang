@@ -170,6 +170,42 @@ func TestRotateAndCrop(t *testing.T) {
 	requirePDF(t, cropped)
 }
 
+func TestScannerEffect(t *testing.T) {
+	client := newClient(t)
+	res, err := client.ScannerEffect(context.Background(), stirling.FromBytes("scan.pdf", testutil.PDF("Scanned page")), stirling.ScannerEffectOptions{
+		Quality:    stirling.ScanQualityMedium,
+		Rotation:   stirling.ScanRotationNone,
+		Colorspace: stirling.ScannerColorspaceGrayscale,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirePDF(t, res)
+}
+
+func TestRedactManual(t *testing.T) {
+	client := newClient(t)
+	res, err := client.RedactManual(context.Background(), stirling.FromBytes("redact.pdf", testutil.PDF("Secret content")), stirling.RedactManualOptions{
+		Pages: "1",
+		Redactions: []stirling.RedactionArea{
+			{X: 20, Y: 20, Width: 120, Height: 60, Page: 1, Color: "#000000"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirePDF(t, res)
+}
+
+func TestSanitizeDefaults(t *testing.T) {
+	client := newClient(t)
+	res, err := client.Sanitize(context.Background(), stirling.FromBytes("sanitize.pdf", testutil.PDF("Sanitize me")), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirePDF(t, res)
+}
+
 func TestConvertToImagesAndText(t *testing.T) {
 	client := newClient(t)
 	input := stirling.FromBytes("convert.pdf", testutil.PDF("Hello from Stirling PDF"))
@@ -327,6 +363,18 @@ func TestCLIEndToEnd(t *testing.T) {
 	output := run(t, nil, binary, "--url", baseURL, "general", "merge-pdfs", "--file", a, "--file", b, "-o", merged)
 	if strings.TrimSpace(output) != merged {
 		t.Fatalf("merge output = %q", output)
+	}
+
+	redacted := filepath.Join(dir, "redacted.pdf")
+	run(t, nil, binary, "--url", baseURL, "security", "redact", "--file", a,
+		"--redactions", `[{"x":20,"y":20,"width":80,"height":40,"page":1,"color":"#000000"}]`,
+		"-o", redacted)
+	redactedData, err := os.ReadFile(redacted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(redactedData, []byte("%PDF")) {
+		t.Fatalf("redacted output is not a PDF: %q", redactedData[:min(len(redactedData), 40)])
 	}
 
 	analysis := run(t, nil, binary, "--url", baseURL, "analysis", "page-count", "--file", merged)

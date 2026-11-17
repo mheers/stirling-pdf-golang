@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 // APIError describes a non-2xx response from Stirling PDF.
@@ -26,10 +27,12 @@ type APIError struct {
 	// URL is the full request URL.
 	URL string
 
-	// Code is the API's short error name ("error" in the JSON body).
+	// Code is the API's short error name: "error" in the Processing API body
+	// or "title" in an RFC 7807 problem response.
 	Code string
 
-	// Message is the human-readable API message.
+	// Message is the human-readable API message: "message" in the Processing
+	// API body or "detail" in an RFC 7807 problem response.
 	Message string
 
 	// Timestamp and Path mirror the remaining fields of the API error body.
@@ -124,17 +127,28 @@ func parseAPIError(method, url string, statusCode int, body []byte, header http.
 	var payload struct {
 		Status    int    `json:"status"`
 		Error     string `json:"error"`
+		Title     string `json:"title"`
 		Message   string `json:"message"`
+		Detail    string `json:"detail"`
 		Timestamp string `json:"timestamp"`
 		Path      string `json:"path"`
 	}
 	if err := json.Unmarshal(body, &payload); err == nil {
-		apiErr.Code = payload.Error
-		apiErr.Message = payload.Message
+		apiErr.Code = firstNonEmpty(payload.Error, payload.Title)
+		apiErr.Message = firstNonEmpty(payload.Message, payload.Detail)
 		apiErr.Timestamp = payload.Timestamp
 		apiErr.Path = payload.Path
 	}
 	return apiErr
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func truncate(s string, n int) string {
@@ -142,5 +156,9 @@ func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }

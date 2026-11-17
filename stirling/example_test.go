@@ -44,7 +44,7 @@ func ExampleClient_Merge() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer merged.Close()
+	defer func() { _ = merged.Close() }()
 
 	if err := merged.Save("report.pdf"); err != nil {
 		log.Fatal(err)
@@ -68,7 +68,7 @@ func ExampleClient_Compress() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer compressed.Close()
+	defer func() { _ = compressed.Close() }()
 
 	if _, err := compressed.SaveTo(os.Stdout); err != nil {
 		log.Fatal(err)
@@ -103,7 +103,7 @@ func ExampleClient_FilterContainsText() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer result.Close()
+	defer func() { _ = result.Close() }()
 	if !result.Matched {
 		return
 	}
@@ -132,5 +132,5 @@ func ExampleClient_RunPipeline() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer result.Close()
+	defer func() { _ = result.Close() }()
 }

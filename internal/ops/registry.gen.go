@@ -514,7 +514,7 @@ var All = []Operation{
 			{Name: "fileInput", Flag: "file", Kind: FileKind, Required: false, Description: ""},
 			{Name: "pageNumbers", Flag: "page-numbers", Kind: StringKind, Required: true, Description: "The pages to select, Supports ranges (e.g., '1,3,5-9'), or 'all' or functions in the format 'an+b' where 'a' is the multiplier of the page number 'n', and 'b' is a constant (e.g., '2n+1', '3n', '6n-5')", Default: "all", HasDefault: true},
 			{Name: "pageRedactionColor", Flag: "page-redaction-color", Kind: StringKind, Required: true, Description: "The color used to fully redact certain pages", Default: "#000000", HasDefault: true},
-			{Name: "redactions", Flag: "redactions", Kind: StringListKind, Required: true, Description: "A list of areas that should be redacted"},
+			{Name: "redactions", Flag: "redactions", Kind: ObjectListKind, Required: true, Description: "A list of areas that should be redacted"},
 		},
 	},
 	{

@@ -35,12 +35,11 @@ Run both:
 make generate
 ```
 
-Do not edit `*.gen.go` or `docs/operations.md` by hand. CI can check that
+Do not edit `*.gen.go` or `docs/operations.md` by hand. CI checks that
 generated files are current:
 
 ```bash
-go generate ./internal/ops
-git diff --exit-code
+make check-generate
 ```
 
 ### Updating the OpenAPI document
@@ -101,9 +100,9 @@ STIRLING_E2E_URL=http://localhost:8080 go test -tags=e2e ./e2e -run TestMergeAnd
 ```
 
 The suite covers status, merge and page analysis, ZIP splitting, compression,
-rotation and cropping, image/text conversion, watermarking, page numbers,
-encryption and decryption, filters, pipelines, and the built CLI (including
-stdin/stdout).
+rotation and cropping, scanner effects, manual redaction, sanitization,
+image/text conversion, watermarking, page numbers, encryption and decryption,
+filters, pipelines, and the built CLI (including stdin/stdout).
 
 ## Adding an operation
 
@@ -142,17 +141,19 @@ build time:
 go build -ldflags "-X github.com/mheers/stirling-pdf-golang/stirling.Version=v0.2.0" ./cmd/stirling-pdf
 ```
 
-Publishing the GitHub repository and the module proxy is intentionally not part
-of this repository's automation yet.
+Publishing the GitHub repository and the module proxy is manual: the repository
+is public at `github.com/mheers/stirling-pdf-golang`, and version tags are pushed
+by the maintainer.
 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs:
 
 1. `gofmt` check and `go vet`
-2. unit tests with the race detector
-3. the `e2e` suite with Docker (GitHub-hosted runners provide it)
-4. a CLI build and `--help` smoke test
+2. a check that the generated operation registry and docs are current
+3. unit tests with the race detector
+4. the `e2e` suite with Docker (GitHub-hosted runners provide it)
+5. a CLI build and `--help` smoke test
 
 The e2e job pulls the Stirling PDF image, which dominates its runtime. Cache
 Docker layers or point `STIRLING_PDF_IMAGE` at a mirror if that becomes a

@@ -67,3 +67,21 @@ func TestRegistryCoversEveryDocumentedOperation(t *testing.T) {
 		t.Errorf("registry has %d operations, document has %d", len(All), len(documented))
 	}
 }
+
+func TestObjectListFields(t *testing.T) {
+	for _, operation := range All {
+		if operation.Path != "/api/v1/security/redact" {
+			continue
+		}
+		for _, field := range operation.Fields {
+			if field.Name == "redactions" {
+				if field.Kind != ObjectListKind {
+					t.Fatalf("redactions kind = %q, want %q", field.Kind, ObjectListKind)
+				}
+				return
+			}
+		}
+		t.Fatal("redact operation has no redactions field")
+	}
+	t.Fatal("redact operation is missing from the registry")
+}

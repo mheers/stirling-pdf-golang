@@ -13,8 +13,9 @@ import (
 // Result is a successful Stirling PDF response.
 //
 // Responses can be binary documents, ZIP archives, images, plain text, or
-// JSON. Body is streamed; call [Result.Close] when done, or use [Result.Bytes],
-// [Result.Save], or [Result.SaveTo], which consume and close it.
+// JSON. Body is streamed; call [Result.Close] when done, or use [Result.Bytes]
+// or [Result.Save], which consume and close it. [Result.SaveTo] consumes the
+// body without closing it.
 type Result struct {
 	// StatusCode is the HTTP status code. A filter operation that does not
 	// match returns 204 and an empty body.
@@ -55,6 +56,9 @@ func (r *Result) Bytes() ([]byte, error) {
 
 // Save streams the body to path and closes it. Existing files are truncated.
 func (r *Result) Save(path string) error {
+	if r == nil {
+		return errors.New("stirling: save: nil result")
+	}
 	if path == "" {
 		return errors.New("stirling: save: empty path")
 	}
@@ -62,8 +66,10 @@ func (r *Result) Save(path string) error {
 	if err != nil {
 		return err
 	}
+	defer func() { _ = r.Close() }()
 	if _, err := r.SaveTo(file); err != nil {
 		_ = file.Close()
+		_ = os.Remove(path)
 		return err
 	}
 	return file.Close()

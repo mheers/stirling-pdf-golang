@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestAPIErrorFromJSON(t *testing.T) {
@@ -53,6 +54,38 @@ func TestAPIErrorFromPlainText(t *testing.T) {
 	err := parseAPIError(http.MethodPost, "https://example.test/x", 502, []byte("bad gateway"), nil)
 	if !strings.Contains(err.Error(), "bad gateway") {
 		t.Fatalf("Error() = %q", err.Error())
+	}
+}
+
+func TestAPIErrorFromProblemJSON(t *testing.T) {
+	body := []byte(`{
+		"detail": "An unexpected error occurred. Please try again later.",
+		"instance": "/api/v1/security/redact",
+		"status": 500,
+		"title": "Internal Server Error",
+		"type": "/errors/unexpected"
+	}`)
+	err := parseAPIError(http.MethodPost, "https://example.test/api/v1/security/redact", 500, body, nil)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("error %T is not *APIError", err)
+	}
+	if apiErr.Code != "Internal Server Error" {
+		t.Errorf("Code = %q", apiErr.Code)
+	}
+	if apiErr.Message != "An unexpected error occurred. Please try again later." {
+		t.Errorf("Message = %q", apiErr.Message)
+	}
+	if got := err.Error(); !strings.Contains(got, "Internal Server Error") || !strings.Contains(got, "unexpected error") {
+		t.Errorf("Error() = %q", got)
+	}
+}
+
+func TestTruncateKeepsValidUTF8(t *testing.T) {
+	body := strings.Repeat("é", 400)
+	got := truncate(body, 241)
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncate produced invalid UTF-8: %q", got)
 	}
 }
 

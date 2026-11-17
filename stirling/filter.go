@@ -141,6 +141,7 @@ func (c *Client) filter(ctx context.Context, path string, params []Param) (*Filt
 		return nil, err
 	}
 	if res.IsEmpty() {
+		_ = res.Close()
 		return &FilterResult{Matched: false}, nil
 	}
 	return &FilterResult{Matched: true, Result: res}, nil

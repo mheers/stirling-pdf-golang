@@ -305,13 +305,13 @@ func TestOperationPathsAndFields(t *testing.T) {
 		{
 			name: "ScannerEffect", path: "/api/v1/misc/scanner-effect",
 			call: func(ctx context.Context, c *Client) error {
-				res, err := c.ScannerEffect(ctx, testPDF("a.pdf"), ScannerEffectOptions{Quality: ScanQualityHigh, Rotation: ScanRotationSlight, Colorspace: ColorModeColor})
+				res, err := c.ScannerEffect(ctx, testPDF("a.pdf"), ScannerEffectOptions{Quality: ScanQualityHigh, Rotation: ScanRotationSlight, Colorspace: ScannerColorspaceGrayscale})
 				if err == nil {
 					_ = res.Close()
 				}
 				return err
 			},
-			want: map[string]string{"quality": "high", "rotation": "slight", "colorspace": "color"}, files: map[string][]string{"fileInput": {"a.pdf"}},
+			want: map[string]string{"quality": "high", "rotation": "slight", "colorspace": "grayscale"}, files: map[string][]string{"fileInput": {"a.pdf"}},
 		},
 		{
 			name: "ReplaceInvertColors", path: "/api/v1/misc/replace-invert-pdf",
@@ -701,7 +701,7 @@ func TestOperationPathsAndFields(t *testing.T) {
 				}
 				return err
 			},
-			want:  map[string]string{"pageNumbers": "1", "pageRedactionColor": "#000000", "redactions[0][x]": "1", "redactions[0][page]": "1"},
+			want:  map[string]string{"pageNumbers": "1", "pageRedactionColor": "#000000", "redactions[0].x": "1", "redactions[0].page": "1"},
 			files: map[string][]string{"fileInput": {"a.pdf"}},
 		},
 		{
@@ -930,6 +930,29 @@ func TestFilterNotMatched(t *testing.T) {
 	}
 }
 
+func TestFilterNotMatchedClosesBody(t *testing.T) {
+	body := &trackingReadCloser{Reader: strings.NewReader("")}
+	client, _ := New(WithBaseURL("http://stirling.test"))
+	client.httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     http.Header{},
+			Body:       body,
+			Request:    r,
+		}, nil
+	})
+	res, err := client.FilterPageCount(context.Background(), testPDF("a.pdf"), FilterPageCountOptions{Comparator: Greater, Count: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Matched {
+		t.Fatal("expected no match")
+	}
+	if !body.closed {
+		t.Fatal("filter did not close the empty response body")
+	}
+}
+
 func TestFileIDInput(t *testing.T) {
 	server := newCaptureServer(t)
 	client, _ := New(WithBaseURL(server.server.URL))
@@ -957,5 +980,40 @@ func TestRequiredInputs(t *testing.T) {
 	}
 	if _, err := client.SplitPages(context.Background(), testPDF("a.pdf"), ""); err == nil {
 		t.Error("SplitPages(empty) should fail")
+	}
+	if _, err := client.PDFToWord(context.Background(), testPDF("a.pdf"), ""); err == nil {
+		t.Error("PDFToWord(empty) should fail")
+	}
+	if _, err := client.PDFToText(context.Background(), testPDF("a.pdf"), ""); err == nil {
+		t.Error("PDFToText(empty) should fail")
+	}
+	if _, err := client.PDFToPresentation(context.Background(), testPDF("a.pdf"), ""); err == nil {
+		t.Error("PDFToPresentation(empty) should fail")
+	}
+	if _, err := client.PDFToPDFA(context.Background(), testPDF("a.pdf"), ""); err == nil {
+		t.Error("PDFToPDFA(empty) should fail")
+	}
+	if _, err := client.AddStamp(context.Background(), testPDF("a.pdf"), StampOptions{}); err == nil {
+		t.Error("AddStamp(empty type) should fail")
+	}
+}
+
+func TestTypedNilFileInputs(t *testing.T) {
+	var nilInput *readerInput
+	client, _ := New(WithBaseURL("http://127.0.0.1:1"))
+	if _, err := client.ExtractBookmarks(context.Background(), nilInput); err == nil {
+		t.Error("ExtractBookmarks(typed nil) should fail")
+	}
+	if _, err := client.AddImage(context.Background(), testPDF("a.pdf"), AddImageOptions{Image: nilInput}); err == nil {
+		t.Error("AddImage(typed nil) should fail")
+	}
+
+	server := newCaptureServer(t)
+	client, _ = New(WithBaseURL(server.server.URL))
+	if _, err := client.ValidateSignature(context.Background(), testPDF("a.pdf"), &SignatureValidationOptions{CertFile: nilInput}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := server.last(t).Files["certFile"]; ok {
+		t.Fatal("typed nil certFile was uploaded")
 	}
 }

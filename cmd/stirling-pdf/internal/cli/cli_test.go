@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +14,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/mheers/stirling-pdf-golang/internal/ops"
+	"github.com/mheers/stirling-pdf-golang/stirling"
 )
 
 type request struct {
@@ -246,6 +251,29 @@ func TestStdoutOutput(t *testing.T) {
 	}
 }
 
+func TestObjectListFlag(t *testing.T) {
+	server := newFakeServer(t, nil)
+	pdf := writeTempFile(t, "a.pdf", "%PDF-1.7")
+	redactions := `[{"x":10,"y":20,"width":30,"height":40,"page":1,"color":"#000000"}]`
+	_, _, err := runCLI(t, "--url", server.server.URL, "security", "redact", "--file", pdf, "--redactions", redactions, "-o", "-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := server.last(t).Values
+	for name, want := range map[string]string{
+		"redactions[0].x":      "10",
+		"redactions[0].y":      "20",
+		"redactions[0].width":  "30",
+		"redactions[0].height": "40",
+		"redactions[0].page":   "1",
+		"redactions[0].color":  "#000000",
+	} {
+		if got := values[name]; len(got) != 1 || got[0] != want {
+			t.Errorf("%s = %v, want %q", name, got, want)
+		}
+	}
+}
+
 func TestExtraFields(t *testing.T) {
 	server := newFakeServer(t, nil)
 	pdf := writeTempFile(t, "a.pdf", "%PDF-1.7")
@@ -286,6 +314,84 @@ func TestFileIDFlag(t *testing.T) {
 	}
 	if got := server.last(t).Values["fileId"]; len(got) != 1 || got[0] != "abc" {
 		t.Fatalf("fileId = %v", got)
+	}
+}
+
+func TestFileIDSatisfiesRequiredFile(t *testing.T) {
+	operation := ops.Operation{Fields: []ops.Field{
+		{Name: "fileInput", Flag: "file", Kind: ops.FileKind, Required: true},
+		{Name: "fileId", Flag: "file-id", Kind: ops.StringKind},
+	}}
+	if err := validateFileParams(operation, []stirling.Param{{Name: "fileId", Value: "abc"}}); err != nil {
+		t.Fatalf("file ID should satisfy a required fileInput: %v", err)
+	}
+	if err := validateFileParams(operation, nil); err == nil || !strings.Contains(err.Error(), `required flag(s) "file" not set`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFileAndFileIDConflict(t *testing.T) {
+	operation := ops.Operation{Fields: []ops.Field{
+		{Name: "fileInput", Flag: "file", Kind: ops.FileKind, Required: true},
+		{Name: "fileId", Flag: "file-id", Kind: ops.StringKind},
+	}}
+	err := validateFileParams(operation, []stirling.Param{{Name: "fileInput"}, {Name: "fileId"}})
+	if err == nil || !strings.Contains(err.Error(), "cannot be used together") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFileIDCannotSatisfyFileList(t *testing.T) {
+	operation := ops.Operation{Fields: []ops.Field{
+		{Name: "fileInput", Flag: "file", Kind: ops.FileListKind, Required: true},
+		{Name: "fileId", Flag: "file-id", Kind: ops.StringKind},
+	}}
+	err := validateFileParams(operation, []stirling.Param{{Name: "fileId", Value: "abc"}})
+	if err == nil || !strings.Contains(err.Error(), `required flag(s) "file" not set`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestOutputAndStdoutConflict(t *testing.T) {
+	server := newFakeServer(t, nil)
+	pdf := writeTempFile(t, "a.pdf", "%PDF-1.7")
+	_, _, err := runCLI(t, "--url", server.server.URL, "analysis", "page-count", "--file", pdf, "--stdout", "-o", "out.json")
+	if err == nil || !strings.Contains(err.Error(), "cannot be used together") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestIsTerminal(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if isTerminal(file) {
+		t.Fatal("regular file reported as a terminal")
+	}
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = devNull.Close() }()
+	if isTerminal(devNull) {
+		t.Fatal(os.DevNull + " reported as a terminal")
+	}
+}
+
+func TestExitCode(t *testing.T) {
+	if got := exitCode(nil); got != 0 {
+		t.Fatalf("exitCode(nil) = %d", got)
+	}
+	if got := exitCode(context.Canceled); got != 130 {
+		t.Fatalf("exitCode(canceled) = %d", got)
+	}
+	if got := exitCode(fmt.Errorf("wrapped: %w", context.Canceled)); got != 130 {
+		t.Fatalf("exitCode(wrapped canceled) = %d", got)
+	}
+	if got := exitCode(errors.New("boom")); got != 1 {
+		t.Fatalf("exitCode(error) = %d", got)
 	}
 }
 
@@ -332,6 +438,9 @@ func TestListCommand(t *testing.T) {
 	}
 	if len(entries) != 6 {
 		t.Fatalf("entries = %d", len(entries))
+	}
+	if _, _, err := runCLI(t, "list", "--group", "nope", "--json"); err == nil || !strings.Contains(err.Error(), "unknown group") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

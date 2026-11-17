@@ -104,6 +104,36 @@ func TestRequestHeadersAndSubpath(t *testing.T) {
 	}
 }
 
+func TestWithHeaderOverridesDefaults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Values("Accept"); len(got) != 1 || got[0] != "application/json" {
+			t.Errorf("Accept = %v", got)
+		}
+		if got := r.Header.Values("Content-Type"); len(got) != 1 || got[0] != "application/x-custom" {
+			t.Errorf("Content-Type = %v", got)
+		}
+		if got := r.Header.Get("User-Agent"); got != "custom-agent" {
+			t.Errorf("User-Agent = %q", got)
+		}
+	}))
+	defer srv.Close()
+
+	c, err := New(
+		WithBaseURL(srv.URL),
+		WithHeader("Accept", "application/json"),
+		WithHeader("Content-Type", "application/x-custom"),
+		WithUserAgent("custom-agent"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.Call(context.Background(), "/x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Close()
+}
+
 func TestCallReturnsAPIError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -327,6 +357,18 @@ func TestWithRetriesNegative(t *testing.T) {
 	}
 	if c.retry.MaxRetries != 0 {
 		t.Fatalf("max retries = %d", c.retry.MaxRetries)
+	}
+}
+
+func TestWithRequestEditorNil(t *testing.T) {
+	if _, err := New(WithRequestEditor(nil)); err == nil {
+		t.Fatal("expected an error for a nil request editor")
+	}
+}
+
+func TestWithHeaderEmptyName(t *testing.T) {
+	if _, err := New(WithHeader("", "value")); err == nil {
+		t.Fatal("expected an error for an empty header name")
 	}
 }
 

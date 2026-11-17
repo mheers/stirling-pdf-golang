@@ -41,8 +41,13 @@ func (f *form) add(name string, value any) error {
 			return nil
 		}
 		if id, ok := FileID(v); ok {
-			f.fields = append(f.fields, Param{Name: "fileId", Value: id})
-			return nil
+			switch name {
+			case "fileInput", "file":
+				f.fields = append(f.fields, Param{Name: "fileId", Value: id})
+				return nil
+			default:
+				return fmt.Errorf("stirling: form field %q cannot reference a server-side file ID", name)
+			}
 		}
 		f.fields = append(f.fields, Param{Name: name, Value: v})
 		return nil
@@ -50,6 +55,9 @@ func (f *form) add(name string, value any) error {
 		for _, file := range v {
 			if isNilFile(file) {
 				return fmt.Errorf("stirling: form field %q contains a nil file", name)
+			}
+			if _, ok := FileID(file); ok {
+				return fmt.Errorf("stirling: form field %q cannot contain server-side file IDs", name)
 			}
 		}
 		if len(v) > 0 {
@@ -104,7 +112,7 @@ func (f *form) add(name string, value any) error {
 			}
 			sort.Strings(keys)
 			for _, key := range keys {
-				field := fmt.Sprintf("%s[%d][%s]", name, i, key)
+				field := fmt.Sprintf("%s[%d].%s", name, i, key)
 				f.fields = append(f.fields, Param{Name: field, Value: object[key]})
 			}
 		}
@@ -241,8 +249,19 @@ func fileContentType(name string) string {
 	return "application/octet-stream"
 }
 
+var quoteReplacer = strings.NewReplacer(
+	"\\", "\\\\",
+	`"`, `\"`,
+)
+
 func escapeQuotes(s string) string {
-	return strings.NewReplacer("\\", "\\\\", `"`, "\\\"").Replace(s)
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
+	return quoteReplacer.Replace(s)
 }
 
 func scalarString(value any) (string, error) {

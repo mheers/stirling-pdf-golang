@@ -186,9 +186,8 @@ A pipeline runs several operations in one request. Use the typed builder:
 
 ```go
 pipeline := stirling.Pipeline{Name: "prepare-for-email"}
-pipeline.Step("/api/v1/misc/repair", nil)
 pipeline.Step("/api/v1/security/sanitize-pdf", map[string]any{
-	"removeJavaScript": true,
+	"removeJavaScript":    true,
 	"removeEmbeddedFiles": true,
 })
 pipeline.Step("/api/v1/misc/compress-pdf", map[string]any{"optimizeLevel": 2})
@@ -312,6 +311,10 @@ Supported `Param.Value` types: strings, booleans, integers, floats, `time.Time`,
 | `AddPageNumbers(ctx, in, PageNumbersOptions)` | `/api/v1/misc/add-page-numbers` |
 | `AddImage(ctx, in, AddImageOptions)` | `/api/v1/misc/add-image` |
 | `AddAttachments(ctx, in, attachments)` | `/api/v1/misc/add-attachments` |
+
+`ScannerEffect` uses `ScannerColorspaceColor` or `ScannerColorspaceGrayscale`.
+The scanner endpoint spells greyscale `grayscale`, while the conversion
+endpoints use `ColorModeGreyscale`.
 
 ### Analysis and filter
 

@@ -29,10 +29,12 @@ Stirling PDF servers.
 go get github.com/mheers/stirling-pdf-golang
 ```
 
-The CLI can be built from a checkout:
+The CLI can be built from a checkout or installed directly:
 
 ```bash
 go build -o bin/stirling-pdf ./cmd/stirling-pdf
+# or
+go install github.com/mheers/stirling-pdf-golang/cmd/stirling-pdf@latest
 ```
 
 ## SDK quick start

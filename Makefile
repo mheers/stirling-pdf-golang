@@ -30,8 +30,9 @@ generate:
 	gofmt -w api internal/ops cmd stirling
 
 check-generate:
-	$(GO) generate ./internal/ops
-	git diff --exit-code -- internal/ops/registry.gen.go docs/operations.md
+	$(GO) generate ./api ./internal/ops
+	gofmt -w api internal/ops
+	git diff --exit-code -- api/client.gen.go api/types.gen.go internal/ops/registry.gen.go docs/operations.md
 
 clean:
 	rm -rf bin coverage.txt coverage.html

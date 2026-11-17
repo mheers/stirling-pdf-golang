@@ -83,6 +83,10 @@ func TestResultSave(t *testing.T) {
 	if err := r.Save(""); err == nil {
 		t.Fatal("expected an error for an empty path")
 	}
+	var nilResult *Result
+	if err := nilResult.Save(path); err == nil {
+		t.Fatal("expected an error for a nil result")
+	}
 }
 
 func TestResultSaveTo(t *testing.T) {
@@ -99,6 +103,34 @@ func TestResultSaveTo(t *testing.T) {
 	if n != 4 || dst.String() != "copy" {
 		t.Fatalf("SaveTo() = %d, %q", n, dst.String())
 	}
+}
+
+func TestResultSaveClosesBody(t *testing.T) {
+	body := &trackingReadCloser{Reader: bytes.NewBufferString("pdf-bytes")}
+	r := &Result{
+		StatusCode: 200,
+		Header:     http.Header{},
+		Body:       body,
+	}
+	if err := r.Save(filepath.Join(t.TempDir(), "out.pdf")); err != nil {
+		t.Fatal(err)
+	}
+	if !body.closed {
+		t.Fatal("Save() did not close the body")
+	}
+}
+
+func TestResultSaveToLeavesBodyOpen(t *testing.T) {
+	body := &trackingReadCloser{Reader: bytes.NewBufferString("copy")}
+	r := &Result{StatusCode: 200, Header: http.Header{}, Body: body}
+	var dst bytes.Buffer
+	if _, err := r.SaveTo(&dst); err != nil {
+		t.Fatal(err)
+	}
+	if body.closed {
+		t.Fatal("SaveTo() closed the body")
+	}
+	_ = r.Close()
 }
 
 func TestResultExtensionAndContentType(t *testing.T) {
@@ -152,6 +184,17 @@ func TestResultReadError(t *testing.T) {
 	r := &Result{Body: io.NopCloser(errReader{err: boom})}
 	if _, err := r.Bytes(); !errors.Is(err, boom) {
 		t.Fatalf("Bytes() error = %v", err)
+	}
+}
+
+func TestResultSaveRemovesPartialFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.pdf")
+	r := &Result{Body: io.NopCloser(errReader{err: errors.New("boom")})}
+	if err := r.Save(path); err == nil {
+		t.Fatal("expected a copy error")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("partial file remains: %v", err)
 	}
 }
 

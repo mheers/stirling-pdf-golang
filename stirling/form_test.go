@@ -131,14 +131,14 @@ func TestFormSlicesAndMaps(t *testing.T) {
 	if got := values["custom[a]"]; len(got) != 1 || got[0] != "1" {
 		t.Errorf("custom[a] = %v", got)
 	}
-	if got := values["redactions[0][x]"]; len(got) != 1 || got[0] != "1.5" {
-		t.Errorf("redactions[0][x] = %v", got)
+	if got := values["redactions[0].x"]; len(got) != 1 || got[0] != "1.5" {
+		t.Errorf("redactions[0].x = %v", got)
 	}
-	if got := values["redactions[0][page]"]; len(got) != 1 || got[0] != "2" {
-		t.Errorf("redactions[0][page] = %v", got)
+	if got := values["redactions[0].page"]; len(got) != 1 || got[0] != "2" {
+		t.Errorf("redactions[0].page = %v", got)
 	}
-	if got := values["redactions[1][color]"]; len(got) != 1 || got[0] != "" {
-		t.Errorf("redactions[1][color] = %v", got)
+	if got := values["redactions[1].color"]; len(got) != 1 || got[0] != "" {
+		t.Errorf("redactions[1].color = %v", got)
 	}
 }
 
@@ -210,5 +210,56 @@ func TestFormBodyTwice(t *testing.T) {
 		if len(values) != 0 || len(files["fileInput"]) != 1 {
 			t.Fatalf("attempt %d: values=%v files=%v", i, values, files)
 		}
+	}
+}
+
+func TestFormFileID(t *testing.T) {
+	f := newForm()
+	if err := f.add("fileInput", FromFileID("abc")); err != nil {
+		t.Fatal(err)
+	}
+	body, ct, err := f.body()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, values, files := parseMultipart(t, body, ct)
+	if got := values["fileId"]; len(got) != 1 || got[0] != "abc" {
+		t.Fatalf("fileId = %v", got)
+	}
+	if len(files) != 0 {
+		t.Fatalf("unexpected files: %v", files)
+	}
+
+	if err := newForm().add("stampImage", FromFileID("abc")); err == nil {
+		t.Fatal("expected an error for a file ID in a non-primary file field")
+	}
+	if err := newForm().add("attachments", []FileInput{FromFileID("abc")}); err == nil {
+		t.Fatal("expected an error for a file ID in a file list")
+	}
+}
+
+func TestFormSanitizesUploadHeaders(t *testing.T) {
+	f := newForm()
+	name := "evil\r\nX-Injected: yes\".pdf"
+	if err := f.add("fileInput", FromBytes(name, []byte("data"))); err != nil {
+		t.Fatal(err)
+	}
+	body, ct, err := f.body()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, values, files := parseMultipart(t, body, ct)
+	parts := files["fileInput"]
+	if len(parts) != 1 {
+		t.Fatalf("files = %v", files)
+	}
+	if parts[0].name != `evil  X-Injected: yes\".pdf` {
+		t.Fatalf("filename = %q", parts[0].name)
+	}
+	if len(values) != 0 {
+		t.Fatalf("injected fields: %v", values)
+	}
+	if len(files) != 1 {
+		t.Fatalf("injected parts: %v", files)
 	}
 }

@@ -55,6 +55,9 @@ func (c *Client) PDFToXML(ctx context.Context, in FileInput) (*Result, error) {
 
 // PDFToWord converts a PDF to a word-processing document.
 func (c *Client) PDFToWord(ctx context.Context, in FileInput, format PDFToWordFormat) (*Result, error) {
+	if format == "" {
+		return nil, fmt.Errorf("stirling: PDF to word: output format is required")
+	}
 	params, err := inputParams(in)
 	if err != nil {
 		return nil, err
@@ -65,6 +68,9 @@ func (c *Client) PDFToWord(ctx context.Context, in FileInput, format PDFToWordFo
 
 // PDFToText converts a PDF to plain text or RTF.
 func (c *Client) PDFToText(ctx context.Context, in FileInput, format PDFToTextFormat) (*Result, error) {
+	if format == "" {
+		return nil, fmt.Errorf("stirling: PDF to text: output format is required")
+	}
 	params, err := inputParams(in)
 	if err != nil {
 		return nil, err
@@ -75,6 +81,9 @@ func (c *Client) PDFToText(ctx context.Context, in FileInput, format PDFToTextFo
 
 // PDFToPresentation converts a PDF to a presentation document.
 func (c *Client) PDFToPresentation(ctx context.Context, in FileInput, format PDFToPresentationFormat) (*Result, error) {
+	if format == "" {
+		return nil, fmt.Errorf("stirling: PDF to presentation: output format is required")
+	}
 	params, err := inputParams(in)
 	if err != nil {
 		return nil, err
@@ -85,6 +94,9 @@ func (c *Client) PDFToPresentation(ctx context.Context, in FileInput, format PDF
 
 // PDFToPDFA converts a PDF to a PDF/A profile.
 func (c *Client) PDFToPDFA(ctx context.Context, in FileInput, format PDFToPDFAFormat) (*Result, error) {
+	if format == "" {
+		return nil, fmt.Errorf("stirling: PDF to PDF/A: output format is required")
+	}
 	params, err := inputParams(in)
 	if err != nil {
 		return nil, err

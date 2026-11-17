@@ -44,12 +44,15 @@ type operation struct {
 }
 
 type schema struct {
-	Ref        string              `json:"$ref"`
-	Type       string              `json:"type"`
-	Format     string              `json:"format"`
-	Required   []string            `json:"required"`
-	Properties map[string]property `json:"properties"`
-	Items      *property           `json:"items"`
+	Ref         string              `json:"$ref"`
+	Type        string              `json:"type"`
+	Format      string              `json:"format"`
+	Description string              `json:"description"`
+	Required    []string            `json:"required"`
+	Properties  map[string]property `json:"properties"`
+	Items       *property           `json:"items"`
+	Enum        []any               `json:"enum"`
+	Default     any                 `json:"default"`
 }
 
 type property struct {
@@ -143,7 +146,7 @@ func buildOperations(document spec) []opDef {
 				if body.Ref != "" {
 					body = resolve(document, body.Ref)
 				}
-				defined.Fields = buildFields(body)
+				defined.Fields = buildFields(document, body)
 			}
 		}
 		operations = append(operations, defined)
@@ -178,7 +181,7 @@ func commandName(apiPath, group string) string {
 	return strings.Join(parts, "-")
 }
 
-func buildFields(body schema) []field {
+func buildFields(document spec, body schema) []field {
 	required := map[string]bool{}
 	for _, name := range body.Required {
 		required[name] = true
@@ -193,7 +196,7 @@ func buildFields(body schema) []field {
 		prop := body.Properties[name]
 		defined := field{
 			Name:        name,
-			Kind:        fieldKind(prop),
+			Kind:        fieldKind(document, prop),
 			Required:    required[name],
 			Description: collapse(prop.Description),
 		}
@@ -209,7 +212,7 @@ func buildFields(body schema) []field {
 	return fields
 }
 
-func fieldKind(prop property) string {
+func fieldKind(document spec, prop property) string {
 	if prop.Type == "string" && prop.Format == "binary" {
 		return "File"
 	}
@@ -226,10 +229,11 @@ func fieldKind(prop property) string {
 		if prop.Items == nil {
 			return "StringList"
 		}
-		if prop.Items.Format == "binary" {
+		item := resolveProperty(document, *prop.Items)
+		if item.Format == "binary" {
 			return "FileList"
 		}
-		switch prop.Items.Type {
+		switch item.Type {
 		case "object":
 			return "ObjectList"
 		case "integer":
@@ -240,6 +244,22 @@ func fieldKind(prop property) string {
 		return "StringList"
 	}
 	return "String"
+}
+
+func resolveProperty(document spec, prop property) property {
+	if prop.Ref == "" {
+		return prop
+	}
+	resolved := resolve(document, prop.Ref)
+	return property{
+		Type:        resolved.Type,
+		Format:      resolved.Format,
+		Description: resolved.Description,
+		Enum:        resolved.Enum,
+		Default:     resolved.Default,
+		Items:       resolved.Items,
+		Properties:  resolved.Properties,
+	}
 }
 
 func responseKind(content map[string]json.RawMessage) string {

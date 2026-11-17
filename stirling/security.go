@@ -108,7 +108,7 @@ func (c *Client) ValidateSignature(ctx context.Context, in FileInput, opts *Sign
 	if err != nil {
 		return nil, err
 	}
-	if opts != nil && opts.CertFile != nil {
+	if opts != nil && !isNilFile(opts.CertFile) {
 		params = append(params, Param{Name: "certFile", Value: opts.CertFile})
 	}
 	return c.CallJSON(ctx, "/api/v1/security/validate-signature", params...)
@@ -213,7 +213,7 @@ func (c *Client) SignPDF(ctx context.Context, in FileInput, opts SignPDFOptions)
 		{"p12File", opts.P12File},
 		{"jksFile", opts.JKSFile},
 	} {
-		if item.file != nil {
+		if !isNilFile(item.file) {
 			params = append(params, Param{Name: item.name, Value: item.file})
 		}
 	}
@@ -273,7 +273,7 @@ func (c *Client) AddWatermark(ctx context.Context, in FileInput, opts WatermarkO
 	if opts.Text != "" {
 		params = append(params, Param{Name: "watermarkText", Value: opts.Text})
 	}
-	if opts.Image != nil {
+	if !isNilFile(opts.Image) {
 		params = append(params, Param{Name: "watermarkImage", Value: opts.Image})
 	}
 	if opts.Alphabet != "" {

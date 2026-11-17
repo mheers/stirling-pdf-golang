@@ -81,11 +81,11 @@ func newStatusCommand(opts *options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), string(body))
-				return nil
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), string(body))
+				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", status.Version, status.Status)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", status.Version, status.Status)
+			return err
 		},
 	}
 	command.Flags().BoolVar(&asJSON, "json", false, "print the raw JSON response")
@@ -120,24 +120,28 @@ func newListCommand() *cobra.Command {
 					Summary: operation.Summary,
 				})
 			}
+			if len(entries) == 0 {
+				return fmt.Errorf("unknown group %q", group)
+			}
 			if asJSON {
 				body, err := json.MarshalIndent(entries, "", "  ")
 				if err != nil {
 					return err
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-			if len(entries) == 0 {
-				return fmt.Errorf("unknown group %q", group)
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), string(body))
+				return err
 			}
 			current := ""
 			for _, entry := range entries {
 				if entry.Group != current {
 					current = entry.Group
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n", current)
+					if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", current); err != nil {
+						return err
+					}
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-34s %s\n", entry.Command, entry.Summary)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  %-34s %s\n", entry.Command, entry.Summary); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -154,8 +158,9 @@ func newVersionCommand() *cobra.Command {
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "stirling-pdf %s\n", stirling.Version)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "stirling-pdf %s\n", stirling.Version)
+			return err
 		},
 	}
 }
