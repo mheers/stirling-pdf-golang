@@ -1,0 +1,19 @@
+# Binaries
+/bin/
+/dist/
+/stirling-pdf
+*.exe
+*.test
+*.out
+
+# Coverage and test artifacts
+coverage.txt
+coverage.html
+/testdata/out/
+/e2e/out/
+
+# Editor/OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
